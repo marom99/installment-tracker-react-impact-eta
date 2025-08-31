@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { parseNumber } from "./utils.mjs";
 
 // -----------------------------
 // Installment Tracker (Single File)
@@ -8,7 +9,7 @@ import React, { useEffect, useMemo, useState } from "react";
 // - Hide completed, Sort by any column
 // - Quick action: Mark 1 month paid
 // - LocalStorage persistence
-// - Import/Export CSV (bank,transaction,monthlyPayment,monthsPaid,totalMonths,note)
+// - Import/Export CSV (bank,transaction,monthlyPayment,monthsPaid,totalMonths,monthsLeft,restBill,note)
 // - Notes per row
 // - Insights > Snapshot (monthly burden, bank & merchant shares)
 // - Insights > Cash‑flow Relief timeline (month‑by‑month burden drop)
@@ -23,7 +24,6 @@ const IDR = new Intl.NumberFormat("id-ID", {
 });
 
 function formatIDR(n) { if (isNaN(n)) return "-"; return IDR.format(Math.round(n)); }
-function parseNumber(v) { if (typeof v === "number") return v; if (!v) return 0; const cleaned = String(v).replace(/[^0-9.-]/g, ""); const n = Number(cleaned); return isNaN(n) ? 0 : n; }
 
 const SAMPLE = [
   // Mandiri
@@ -105,6 +105,12 @@ function addMonths(date, n) {
 
 function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
   const [draft, setDraft] = useState(() => initial || { bank: "", transaction: "", monthlyPayment: 0, monthsPaid: 0, totalMonths: 1, note: "" });
+  useEffect(() => {
+    setDraft((d) => {
+      const clamped = Math.min(parseNumber(d.monthsPaid), parseNumber(d.totalMonths));
+      return clamped === d.monthsPaid ? d : { ...d, monthsPaid: clamped };
+    });
+  }, [draft.totalMonths]);
   const monthsLeft = Math.max(0, parseNumber(draft.totalMonths) - parseNumber(draft.monthsPaid));
   const restBill = monthsLeft * parseNumber(draft.monthlyPayment);
 
@@ -151,7 +157,19 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span>Months Already Paid</span>
-            <input type="number" min={0} className="border rounded-xl px-3 py-2" value={draft.monthsPaid} onChange={(e) => setDraft({ ...draft, monthsPaid: parseNumber(e.target.value) })} />
+            <input
+              type="number"
+              min={0}
+              max={draft.totalMonths}
+              className="border rounded-xl px-3 py-2"
+              value={draft.monthsPaid}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  monthsPaid: Math.min(parseNumber(e.target.value), parseNumber(draft.totalMonths)),
+                })
+              }
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span>Note (optional)</span>
@@ -333,9 +351,18 @@ export default function InstallmentTrackerApp() {
   const relief = useRelief(enriched);
 
   function handleSave(draft) {
-    if (editRow) { setRows((prev) => prev.map((r) => (r.id === editRow.id ? { ...editRow, ...draft } : r))); }
-    else { const id = `${Date.now()}`; setRows((prev) => [...prev, { id, ...draft }]); }
-    setShowForm(false); setEditRow(null);
+    const normalized = {
+      ...draft,
+      monthsPaid: Math.min(parseNumber(draft.monthsPaid), parseNumber(draft.totalMonths)),
+    };
+    if (editRow) {
+      setRows((prev) => prev.map((r) => (r.id === editRow.id ? { ...editRow, ...normalized } : r)));
+    } else {
+      const id = `${Date.now()}`;
+      setRows((prev) => [...prev, { id, ...normalized }]);
+    }
+    setShowForm(false);
+    setEditRow(null);
   }
   function handleDelete(id) { setRows((prev) => prev.filter((r) => r.id !== id)); }
   function handlePayOne(id) { setRows((prev) => prev.map((r) => (r.id === id ? { ...r, monthsPaid: Math.min(parseNumber(r.totalMonths), parseNumber(r.monthsPaid) + 1) } : r))); }
@@ -452,7 +479,7 @@ export default function InstallmentTrackerApp() {
                 </tbody>
               </table>
             </div>
-            <div className="text-xs text-gray-500">Tips: The grey badge shows the <em>current month number</em> for each active line (today is {nowLabel}). Use <em>Pay 1</em> after you complete that month.</div>
+            <div className="text-xs text-gray-500">Tips: The gray badge shows the <em>current month number</em> for each active line (today is {nowLabel}). Use <em>Pay 1</em> after you complete that month.</div>
           </>
         )}
 
