@@ -1,0 +1,22 @@
+{
+  "name": "installment-tracker-react-impact-eta",
+  "version": "1.0.0",
+  "description": "Installment tracker app",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.23.9",
+    "@babel/preset-react": "^7.23.3",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.2.0",
+    "@testing-library/user-event": "^14.4.3"
+  }
+}
