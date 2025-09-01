@@ -1,7 +1,9 @@
 module.exports = {
   testEnvironment: 'jsdom',
   transform: {
-    '^.+\\.jsx?$': 'babel-jest'
+    '^.+\.(jsx?|mjs)$': 'babel-jest'
   },
-  setupFilesAfterEnv: ['@testing-library/jest-dom']
+  setupFilesAfterEnv: ['@testing-library/jest-dom'],
+  moduleFileExtensions: ['js', 'jsx', 'mjs'],
+  transformIgnorePatterns: ['/node_modules/(?!.*\.mjs$)']
 };
