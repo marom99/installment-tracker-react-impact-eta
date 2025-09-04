@@ -25,6 +25,19 @@ const IDR = new Intl.NumberFormat("id-ID", {
 
 function formatIDR(n) { if (isNaN(n)) return "-"; return IDR.format(Math.round(n)); }
 
+function formatYearsAndMonths(totalMonths) {
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+
+  const yearString = years > 0 ? `${years} Year${years > 1 ? 's' : ''}` : '';
+  const monthString = months > 0 ? `${months} Month${months > 1 ? 's' : ''}` : '';
+
+  if (yearString && monthString) {
+    return `${yearString} & ${monthString}`;
+  }
+  return yearString || monthString || '0 Months';
+}
+
 const SAMPLE = [
   // Mandiri
   { id: "1", bank: "Mandiri", transaction: "LOTTE GROSIR TEGAL", monthlyPayment: 15487, monthsPaid: 7, totalMonths: 12, note: "Promo ends Dec" },
@@ -520,8 +533,8 @@ export default function InstallmentTrackerApp() {
     const active = enriched.filter((r) => r.monthsLeft > 0);
     const totalMonthly = active.reduce((s, r) => s + parseNumber(r.monthlyPayment), 0);
     const totalRemaining = active.reduce((s, r) => s + r.restBill, 0);
-    const totalMonthsLeft = active.reduce((s, r) => s + r.monthsLeft, 0);
-    return { totalMonthly, totalRemaining, totalMonthsLeft, activeCount: active.length };
+    const maxMonthsLeft = active.reduce((max, r) => Math.max(max, r.monthsLeft), 0);
+    return { totalMonthly, totalRemaining, maxMonthsLeft, activeCount: active.length };
   }, [enriched]);
 
   const snapshot = useSnapshot(enriched);
@@ -656,7 +669,7 @@ export default function InstallmentTrackerApp() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <SummaryCard label="Monthly Commitment (Active)" value={formatIDR(totals.totalMonthly)} sub={`${totals.activeCount} active installments`} />
               <SummaryCard label="Total Remaining Bill" value={formatIDR(totals.totalRemaining)} />
-              <SummaryCard label="Months Left (All Active)" value={`${totals.totalMonthsLeft} months`} />
+              <SummaryCard label="Months Left (All Active)" value={formatYearsAndMonths(totals.maxMonthsLeft)} sub={`${totals.maxMonthsLeft} total months`} />
             </div>
             <div className="flex justify-between items-center">
               <Toolbar 
