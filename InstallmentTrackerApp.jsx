@@ -180,20 +180,47 @@ function addMonths(date, n) {
 }
 
 function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
-  const [draft, setDraft] = useState(() => initial || { bank: "", transaction: "", monthlyPayment: 0, monthsPaid: 0, totalMonths: 1, note: "" });
+  const [draft, setDraft] = useState(() => initial || { bank: "", transaction: "", monthlyPayment: "", monthsPaid: 0, totalMonths: "", note: "" });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const bankInputRef = React.useRef(null);
+
+  useEffect(() => {
+    if (bankInputRef.current) {
+      bankInputRef.current.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    const newErrors = {};
+    if (!draft.bank?.trim()) newErrors.bank = "Bank is required.";
+    if (!draft.transaction?.trim()) newErrors.transaction = "Transaction is required.";
+    if (parseNumber(draft.monthlyPayment) <= 0) newErrors.monthlyPayment = "Monthly payment must be greater than 0.";
+    if (parseNumber(draft.totalMonths) < 1) newErrors.totalMonths = "Total months must be at least 1.";
+    setErrors(newErrors);
+  }, [draft]);
+
   useEffect(() => {
     setDraft((d) => {
       const clamped = Math.min(parseNumber(d.monthsPaid), parseNumber(d.totalMonths));
-      return clamped === d.monthsPaid ? d : { ...d, monthsPaid: clamped };
+      if (clamped === parseNumber(d.monthsPaid)) return d;
+      return { ...d, monthsPaid: clamped };
     });
-  }, [draft.totalMonths]);
+  }, [draft.totalMonths, draft.monthsPaid]);
+
+  const handleBlur = (event) => {
+    const { name } = event.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+  };
+
+  const isInvalid = Object.keys(errors).length > 0;
+
   const monthsLeft = Math.max(0, parseNumber(draft.totalMonths) - parseNumber(draft.monthsPaid));
   const restBill = monthsLeft * parseNumber(draft.monthlyPayment);
 
-  // --- Impact calculations
   const baselineMonthly = useMemo(() => {
     return (allRows || []).reduce((sum, r) => {
-      if (editingId && r.id === editingId) return sum; // exclude the row being edited
+      if (editingId && r.id === editingId) return sum;
       const left = Math.max(0, parseNumber(r.totalMonths) - parseNumber(r.monthsPaid));
       return sum + (left > 0 ? parseNumber(r.monthlyPayment) : 0);
     }, 0);
@@ -201,10 +228,10 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
 
   const draftActiveMonthly = monthsLeft > 0 ? parseNumber(draft.monthlyPayment) : 0;
   const withThisMonthly = baselineMonthly + draftActiveMonthly;
-  const addlMonthly = withThisMonthly - baselineMonthly; // could be 0 if completed
+  const addlMonthly = withThisMonthly - baselineMonthly;
 
   const today = new Date();
-  const finishDate = monthsLeft > 0 ? addMonths(today, monthsLeft - 1) : today; // finishes at the end of (monthsLeft-1) months from now
+  const finishDate = monthsLeft > 0 ? addMonths(today, monthsLeft - 1) : today;
   const finishLabel = monthsLeft > 0 ? monthLabel(finishDate) : "Already finished";
 
   return (
@@ -222,26 +249,30 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
           <label className="flex flex-col gap-1 text-sm">
             <span>Bank</span>
-            <input className="border rounded-xl px-3 py-2" value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} placeholder="e.g., Mandiri" />
+            <input ref={bankInputRef} name="bank" className={`border rounded-xl px-3 py-2 ${touched.bank && errors.bank ? 'border-red-500' : 'border-gray-200'}`} value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} onBlur={handleBlur} placeholder="e.g., Mandiri" />
+            {touched.bank && errors.bank && <div className="text-red-600 text-xs mt-1">{errors.bank}</div>}
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span>Transaction</span>
-            <input className="border rounded-xl px-3 py-2" value={draft.transaction} onChange={(e) => setDraft({ ...draft, transaction: e.target.value })} placeholder="Describe the installment" />
+            <input name="transaction" className={`border rounded-xl px-3 py-2 ${touched.transaction && errors.transaction ? 'border-red-500' : 'border-gray-200'}`} value={draft.transaction} onChange={(e) => setDraft({ ...draft, transaction: e.target.value })} onBlur={handleBlur} placeholder="Describe the installment" />
+            {touched.transaction && errors.transaction && <div className="text-red-600 text-xs mt-1">{errors.transaction}</div>}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span>Monthly Payment (IDR)</span>
-            <input type="number" className="border rounded-xl px-3 py-2" value={draft.monthlyPayment} onChange={(e) => setDraft({ ...draft, monthlyPayment: parseNumber(e.target.value) })} />
+            <input type="number" name="monthlyPayment" className={`border rounded-xl px-3 py-2 ${touched.monthlyPayment && errors.monthlyPayment ? 'border-red-500' : 'border-gray-200'}`} value={draft.monthlyPayment} onChange={(e) => setDraft({ ...draft, monthlyPayment: e.target.value })} onBlur={handleBlur} />
+            {touched.monthlyPayment && errors.monthlyPayment && <div className="text-red-600 text-xs mt-1">{errors.monthlyPayment}</div>}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span>Total Months</span>
-            <input type="number" min={1} className="border rounded-xl px-3 py-2" value={draft.totalMonths} onChange={(e) => setDraft({ ...draft, totalMonths: parseNumber(e.target.value) })} />
+            <input type="number" name="totalMonths" min={1} className={`border rounded-xl px-3 py-2 ${touched.totalMonths && errors.totalMonths ? 'border-red-500' : 'border-gray-200'}`} value={draft.totalMonths} onChange={(e) => setDraft({ ...draft, totalMonths: e.target.value })} onBlur={handleBlur} />
+            {touched.totalMonths && errors.totalMonths && <div className="text-red-600 text-xs mt-1">{errors.totalMonths}</div>}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span>Months Already Paid</span>
             <input
               type="number"
               min={0}
-              max={draft.totalMonths}
+              max={parseNumber(draft.totalMonths) > 0 ? parseNumber(draft.totalMonths) : undefined}
               className="border rounded-xl px-3 py-2"
               value={draft.monthsPaid}
               onChange={(e) =>
@@ -280,7 +311,7 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
         </div>
         <div className="flex items-center justify-end gap-2 mt-6 sticky bottom-0 bg-white z-10 border-t py-3">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl border">Cancel</button>
-          <button onClick={() => onSave(draft)} className="px-4 py-2 rounded-xl border bg-black text-white">Save</button>
+          <button onClick={() => onSave(draft)} disabled={isInvalid} className={`px-4 py-2 rounded-xl border bg-black text-white ${isInvalid ? 'opacity-50 cursor-not-allowed' : ''}`}>Save</button>
         </div>
       </div>
     </div>
