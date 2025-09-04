@@ -1,37 +1,19 @@
-<<<<<<< HEAD
 # Logs
 logs
 *.log
-=======
-# Node
-node_modules/
->>>>>>> 17b95f4 (Initialize project: add Vite React app files and .gitignore)
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-<<<<<<< HEAD
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-=======
+# Dependencies
+node_modules/
 
 # Build output
 dist/
+dist
+dist-ssr
 build/
 .next/
 .nuxt/
@@ -44,14 +26,18 @@ coverage/
 # Environment files
 .env
 .env.*.local
+*.local
 
 # Misc
 .DS_Store
 .eslintcache
-*.local
-*.log
 *.pid
 *.pid.lock
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Editor folders
 .idea/
@@ -60,4 +46,3 @@ coverage/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
->>>>>>> 17b95f4 (Initialize project: add Vite React app files and .gitignore)
