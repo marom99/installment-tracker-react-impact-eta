@@ -209,12 +209,17 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-20">
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div
+        className="w-full max-w-xl bg-white rounded-2xl shadow-lg p-6 max-h-[85vh] overflow-y-auto flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={initial ? "Edit Installment" : "Add Installment"}
+      >
+        <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-10 border-b py-3">
           <h3 className="text-lg font-semibold">{initial ? "Edit Installment" : "Add Installment"}</h3>
           <button onClick={onCancel} className="text-gray-500 hover:text-black">✕</button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
           <label className="flex flex-col gap-1 text-sm">
             <span>Bank</span>
             <input className="border rounded-xl px-3 py-2" value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} placeholder="e.g., Mandiri" />
@@ -273,7 +278,7 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 mt-6">
+        <div className="flex items-center justify-end gap-2 mt-6 sticky bottom-0 bg-white z-10 border-t py-3">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl border">Cancel</button>
           <button onClick={() => onSave(draft)} className="px-4 py-2 rounded-xl border bg-black text-white">Save</button>
         </div>
