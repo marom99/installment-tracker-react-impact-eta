@@ -19,12 +19,20 @@ test('adds an installment', () => {
   // Use a more specific selector for the Add Installment button
   const addButton = screen.getByRole('button', { name: /Add Installment/i });
   fireEvent.click(addButton);
+
+  // The save button should be disabled initially
+  const saveButton = screen.getByRole('button', { name: /Save/i });
+  expect(saveButton).toBeDisabled();
+
+  // Fill the form to enable the save button
   fireEvent.change(screen.getByLabelText(/Bank/i), { target: { value: 'BankA' } });
   fireEvent.change(screen.getByLabelText(/Transaction/i), { target: { value: 'New Purchase' } });
   fireEvent.change(screen.getByLabelText(/Monthly Payment/i), { target: { value: '1000' } });
   fireEvent.change(screen.getByLabelText(/Total Months/i), { target: { value: '12' } });
-  // Use a more specific selector for the Save button
-  const saveButton = screen.getByRole('button', { name: /Save/i });
+
+  // Now the button should be enabled
+  expect(saveButton).not.toBeDisabled();
+
   fireEvent.click(saveButton);
   expect(screen.getByText('New Purchase')).toBeInTheDocument();
 });
