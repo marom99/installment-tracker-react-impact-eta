@@ -104,13 +104,44 @@ function addMonths(date, n) {
 }
 
 function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
-  const [draft, setDraft] = useState(() => initial || { bank: "", transaction: "", monthlyPayment: 0, monthsPaid: 0, totalMonths: 1, note: "" });
+  const [draft, setDraft] = useState(() => initial || { bank: "", transaction: "", monthlyPayment: "", monthsPaid: 0, totalMonths: "", note: "", startDate: "", firstPaymentDate: "" });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const bankInputRef = React.useRef(null);
+  const isEditing = !!initial;
+
+  useEffect(() => {
+    if (bankInputRef.current && !isEditing) {
+      bankInputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    const newErrors = {};
+    if (!draft.bank?.trim()) newErrors.bank = "Bank is required.";
+    if (!draft.transaction?.trim()) newErrors.transaction = "Transaction is required.";
+    if (parseNumber(draft.monthlyPayment) <= 0) newErrors.monthlyPayment = "Monthly payment must be greater than 0.";
+    if (parseNumber(draft.totalMonths) < 1) newErrors.totalMonths = "Total months must be at least 1.";
+    if (!draft.startDate) newErrors.startDate = "Start date is required.";
+    if (!draft.firstPaymentDate) newErrors.firstPaymentDate = "First payment date is required.";
+    setErrors(newErrors);
+  }, [draft]);
+
   useEffect(() => {
     setDraft((d) => {
       const clamped = Math.min(parseNumber(d.monthsPaid), parseNumber(d.totalMonths));
-      return clamped === d.monthsPaid ? d : { ...d, monthsPaid: clamped };
+      if (clamped === parseNumber(d.monthsPaid)) return d;
+      return { ...d, monthsPaid: clamped };
     });
-  }, [draft.totalMonths]);
+  }, [draft.totalMonths, draft.monthsPaid]);
+
+  const handleBlur = (event) => {
+    const { name } = event.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+  };
+
+  const isInvalid = Object.keys(errors).length > 0;
+
   const monthsLeft = Math.max(0, parseNumber(draft.totalMonths) - parseNumber(draft.monthsPaid));
   const restBill = monthsLeft * parseNumber(draft.monthlyPayment);
 
@@ -133,73 +164,277 @@ function AddEditForm({ initial, onCancel, onSave, allRows, editingId }) {
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-20">
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">{initial ? "Edit Installment" : "Add Installment"}</h3>
-          <button onClick={onCancel} className="text-gray-500 hover:text-black">✕</button>
+      <div
+        className="w-full max-w-4xl bg-white rounded-2xl shadow-lg max-h-[90vh] overflow-y-auto flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-label={initial ? "Edit Installment" : "Add Installment"}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b bg-gray-50 rounded-t-2xl">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">{initial ? "Edit Installment" : "Add New Installment"}</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              {isEditing ? "Update installment details and payment progress" : "Create a new installment record"}
+            </p>
+          </div>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span>Bank</span>
-            <input className="border rounded-xl px-3 py-2" value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} placeholder="e.g., Mandiri" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span>Transaction</span>
-            <input className="border rounded-xl px-3 py-2" value={draft.transaction} onChange={(e) => setDraft({ ...draft, transaction: e.target.value })} placeholder="Describe the installment" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span>Monthly Payment (IDR)</span>
-            <input type="number" className="border rounded-xl px-3 py-2" value={draft.monthlyPayment} onChange={(e) => setDraft({ ...draft, monthlyPayment: parseNumber(e.target.value) })} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span>Total Months</span>
-            <input type="number" min={1} className="border rounded-xl px-3 py-2" value={draft.totalMonths} onChange={(e) => setDraft({ ...draft, totalMonths: parseNumber(e.target.value) })} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span>Months Already Paid</span>
-            <input
-              type="number"
-              min={0}
-              max={draft.totalMonths}
-              className="border rounded-xl px-3 py-2"
-              value={draft.monthsPaid}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  monthsPaid: Math.min(parseNumber(e.target.value), parseNumber(draft.totalMonths)),
-                })
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span>Note (optional)</span>
-            <textarea rows={3} className="border rounded-xl px-3 py-2" value={draft.note || ""} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Add reminders, due day, account number, etc." />
-          </label>
 
-          {/* Existing at-a-glance metrics */}
-          <div className="rounded-xl border p-3 text-sm bg-gray-50 flex flex-col gap-1 md:col-span-2">
-            <div className="flex justify-between"><span>Months Left</span><span className="font-medium">{monthsLeft}</span></div>
-            <div className="flex justify-between"><span>Remaining Bill</span><span className="font-medium">{formatIDR(restBill)}</span></div>
+        <div className="flex-1 p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Section: Transaction Details */}
+            <div className="space-y-6">
+              <div className="border-l-4 border-blue-500 pl-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-1">Transaction Details</h4>
+                <p className="text-sm text-gray-600">Basic information about this installment</p>
+              </div>
+              
+              <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">Bank / Institution</span>
+                    <input 
+                      ref={bankInputRef} 
+                      name="bank" 
+                      className={`border rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        touched.bank && errors.bank ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                      }`} 
+                      value={draft.bank} 
+                      onChange={(e) => setDraft({ ...draft, bank: e.target.value })} 
+                      onBlur={handleBlur} 
+                      placeholder="e.g., Mandiri, BCA, Shopee" 
+                      disabled={isEditing}
+                    />
+                    {touched.bank && errors.bank && <div className="text-red-600 text-xs">{errors.bank}</div>}
+                  </label>
+                  
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">Monthly Payment</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">IDR</span>
+                      <input 
+                        type="number" 
+                        name="monthlyPayment" 
+                        className={`border rounded-lg pl-12 pr-3 py-2.5 text-sm transition-colors ${
+                          touched.monthlyPayment && errors.monthlyPayment ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                        }`} 
+                        value={draft.monthlyPayment} 
+                        onChange={(e) => setDraft({ ...draft, monthlyPayment: e.target.value })} 
+                        onBlur={handleBlur}
+                        disabled={isEditing}
+                      />
+                    </div>
+                    {touched.monthlyPayment && errors.monthlyPayment && <div className="text-red-600 text-xs">{errors.monthlyPayment}</div>}
+                  </label>
+                </div>
+                
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-gray-700">Transaction Description</span>
+                  <input 
+                    name="transaction" 
+                    className={`border rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                      touched.transaction && errors.transaction ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                    }`} 
+                    value={draft.transaction} 
+                    onChange={(e) => setDraft({ ...draft, transaction: e.target.value })} 
+                    onBlur={handleBlur} 
+                    placeholder="Describe what this installment is for"
+                    disabled={isEditing}
+                  />
+                  {touched.transaction && errors.transaction && <div className="text-red-600 text-xs">{errors.transaction}</div>}
+                </label>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">Start Date</span>
+                    <input 
+                      type="date" 
+                      name="startDate" 
+                      className={`border rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        touched.startDate && errors.startDate ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                      }`} 
+                      value={draft.startDate} 
+                      onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} 
+                      onBlur={handleBlur}
+                      disabled={isEditing}
+                    />
+                    {touched.startDate && errors.startDate && <div className="text-red-600 text-xs">{errors.startDate}</div>}
+                  </label>
+                  
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">First Payment Date</span>
+                    <input 
+                      type="date" 
+                      name="firstPaymentDate" 
+                      className={`border rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        touched.firstPaymentDate && errors.firstPaymentDate ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                      }`} 
+                      value={draft.firstPaymentDate} 
+                      onChange={(e) => setDraft({ ...draft, firstPaymentDate: e.target.value })} 
+                      onBlur={handleBlur}
+                      disabled={isEditing}
+                    />
+                    {touched.firstPaymentDate && errors.firstPaymentDate && <div className="text-red-600 text-xs">{errors.firstPaymentDate}</div>}
+                  </label>
+                </div>
+                
+                {isEditing && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Read-only Section</p>
+                        <p className="text-xs text-blue-700 mt-1">Transaction details cannot be modified when editing. Only payment progress can be updated.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Section: Installment Management */}
+            <div className="space-y-6">
+              <div className="border-l-4 border-green-500 pl-4">
+                <h4 className="text-lg font-semibold text-gray-900 mb-1">Payment Progress</h4>
+                <p className="text-sm text-gray-600">Manage installment terms and track payments</p>
+              </div>
+              
+              <div className="bg-green-50 rounded-xl p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">Total Months</span>
+                    <input 
+                      type="number" 
+                      name="totalMonths" 
+                      min={1} 
+                      className={`border rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                        touched.totalMonths && errors.totalMonths ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white focus:border-green-500 focus:ring-2 focus:ring-green-200'
+                      }`} 
+                      value={draft.totalMonths} 
+                      onChange={(e) => setDraft({ ...draft, totalMonths: e.target.value })} 
+                      onBlur={handleBlur}
+                    />
+                    {touched.totalMonths && errors.totalMonths && <div className="text-red-600 text-xs">{errors.totalMonths}</div>}
+                  </label>
+                  
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-gray-700">Months Paid</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={parseNumber(draft.totalMonths) > 0 ? parseNumber(draft.totalMonths) : undefined}
+                      className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-colors"
+                      value={draft.monthsPaid}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          monthsPaid: Math.min(parseNumber(e.target.value), parseNumber(draft.totalMonths)),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-gray-700">Notes & Reminders</span>
+                  <textarea 
+                    rows={3} 
+                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-colors resize-none" 
+                    value={draft.note || ""} 
+                    onChange={(e) => setDraft({ ...draft, note: e.target.value })} 
+                    placeholder="Add payment reminders, due dates, account details, etc."
+                  />
+                </label>
+                
+                {/* Progress Summary */}
+                <div className="bg-white rounded-lg border border-green-200 p-4">
+                  <h5 className="text-sm font-semibold text-gray-900 mb-3">Payment Summary</h5>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Months Remaining</span>
+                      <span className={`font-semibold ${monthsLeft <= 2 ? 'text-amber-600' : 'text-gray-900'}`}>{monthsLeft}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Outstanding Balance</span>
+                      <span className="font-semibold text-gray-900">{formatIDR(restBill)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Progress</span>
+                      <span className="font-semibold text-green-600">{Math.round((parseNumber(draft.monthsPaid) / Math.max(1, parseNumber(draft.totalMonths))) * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* NEW: Impact & ETA */}
-          <div className="rounded-2xl border p-4 bg-white md:col-span-2">
-            <div className="text-sm font-semibold mb-2">Impact if you save this</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div className="flex items-center justify-between"><span>Current monthly (others)</span><span className="font-medium">{formatIDR(baselineMonthly)}</span></div>
-              <div className="flex items-center justify-between"><span>This installment monthly</span><span className="font-medium">{formatIDR(draftActiveMonthly)}</span></div>
-              <div className="flex items-center justify-between"><span>New total monthly</span><span className="font-semibold">{formatIDR(withThisMonthly)}</span></div>
-              <div className="flex items-center justify-between"><span>Additional per month</span><span className={`font-semibold ${addlMonthly>0? 'text-amber-700':''}`}>{formatIDR(addlMonthly)}</span></div>
+          {/* Impact Analysis Section */}
+          <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Financial Impact Analysis
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">Current Monthly (Others)</div>
+                <div className="text-lg font-semibold text-gray-900">{formatIDR(baselineMonthly)}</div>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">This Installment</div>
+                <div className="text-lg font-semibold text-blue-600">{formatIDR(draftActiveMonthly)}</div>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">New Total Monthly</div>
+                <div className="text-lg font-bold text-gray-900">{formatIDR(withThisMonthly)}</div>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">Additional Burden</div>
+                <div className={`text-lg font-bold ${addlMonthly > 0 ? 'text-amber-600' : 'text-green-600'}`}>{formatIDR(addlMonthly)}</div>
+              </div>
             </div>
-            <div className="mt-3 text-sm">
-              <div className="flex items-center justify-between"><span>Finish month (ETA)</span><span className="font-medium">{finishLabel}</span></div>
-              <div className="text-xs text-gray-500 mt-1">ETA assumes this month counts as the next payment; a plan with <em>1 month left</em> finishes this month.</div>
+            <div className="mt-4 bg-white rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Estimated Completion</span>
+                <span className="text-sm font-semibold text-purple-600">{finishLabel}</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Based on current payment schedule and remaining months</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 mt-6">
-          <button onClick={onCancel} className="px-4 py-2 rounded-xl border">Cancel</button>
-          <button onClick={() => onSave(draft)} className="px-4 py-2 rounded-xl border bg-black text-white">Save</button>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50 rounded-b-2xl">
+          <div className="text-sm text-gray-600">
+            {isEditing ? "Update this installment record" : "Create new installment record"}
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={onCancel} 
+              className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={() => onSave(draft)} 
+              disabled={isInvalid} 
+              className={`px-6 py-2.5 text-sm font-medium text-white rounded-lg transition-colors ${
+                isInvalid 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-200'
+              }`}
+            >
+              {isEditing ? "Update Installment" : "Create Installment"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -235,14 +470,24 @@ function Toolbar({ banks, filters, setFilters, onAdd, onImport, onExport, nowLab
 
 function sortBy(items, sort) { const { key, dir } = sort; const sorted = [...items].sort((a, b) => { const av = a[key]; const bv = b[key]; if (typeof av === "number" && typeof bv === "number") return av - bv; return String(av).localeCompare(String(bv)); }); return dir === "asc" ? sorted : sorted.reverse(); }
 
-function HeaderCell({ label, sortKey, sort, setSort }) {
-  const active = sort.key === sortKey;
+function HeaderCell({ children, sortKey, sort, setSort }) {
+  const isSorted = sort.key === sortKey;
+  const isDesc = isSorted && sort.desc;
   return (
-    <th onClick={() => setSort({ key: sortKey, dir: active && sort.dir === "asc" ? "desc" : "asc" })} className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 cursor-pointer select-none">
-      <div className="flex items-center gap-1"><span>{label}</span>{active ? <span>{sort.dir === "asc" ? "▲" : "▼"}</span> : <span className="text-gray-300">↕</span>}</div>
+    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50" onClick={() => setSort({ key: sortKey, desc: isSorted ? !sort.desc : false })}>
+      <div className="flex items-center gap-1">
+        {children}
+        {isSorted && (
+          <svg className={`w-3 h-3 ${isDesc ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
     </th>
   );
 }
+
+
 
 function useSnapshot(enriched) {
   return useMemo(() => {
@@ -318,13 +563,27 @@ export default function InstallmentTrackerApp() {
 
   const banks = useMemo(() => Array.from(new Set(rows.map((r) => r.bank))).sort(), [rows]);
 
+  // Helper function to add months to a date (similar to Excel's EDATE)
+  const addMonths = (dateString, months) => {
+    if (!dateString || months < 0) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    
+    const newDate = new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+    return newDate.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+  };
+
   const enriched = useMemo(() => rows.map((r) => {
     const monthsLeft = Math.max(0, parseNumber(r.totalMonths) - parseNumber(r.monthsPaid));
     const restBill = monthsLeft * parseNumber(r.monthlyPayment);
     const progress = (parseNumber(r.monthsPaid) / Math.max(1, parseNumber(r.totalMonths))) * 100;
     const currentInst = Math.min(parseNumber(r.totalMonths), parseNumber(r.monthsPaid) + 1);
     const isCompleted = monthsLeft === 0;
-    return { note: "", ...r, monthsLeft, restBill, progress, currentInst, isCompleted };
+    
+    // Calculate Finish ETA: First Payment Date + (Total Months - Months Already Paid)
+    const finishETA = addMonths(r.firstPaymentDate, parseNumber(r.totalMonths) - parseNumber(r.monthsPaid));
+    
+    return { note: "", ...r, monthsLeft, restBill, progress, currentInst, isCompleted, finishETA };
   }), [rows]);
 
   const filtered = useMemo(() => {
@@ -426,56 +685,80 @@ export default function InstallmentTrackerApp() {
               <SummaryCard label="Months Left (All Active)" value={`${totals.totalMonthsLeft} months`} />
             </div>
             <Toolbar banks={banks} filters={filters} setFilters={setFilters} onAdd={() => { setEditRow(null); setShowForm(true); }} onImport={handleImportCSV} onExport={handleExportCSV} nowLabel={nowLabel} />
-            <div className="border rounded-2xl overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+            <div className="bg-white rounded-xl border overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <HeaderCell label="Bank" sortKey="bank" sort={sort} setSort={setSort} />
-                    <HeaderCell label="Transaction" sortKey="transaction" sort={sort} setSort={setSort} />
-                    <HeaderCell label="Monthly Payment" sortKey="monthlyPayment" sort={sort} setSort={setSort} />
-                    <HeaderCell label="Months Paid" sortKey="monthsPaid" sort={sort} setSort={setSort} />
-                    <HeaderCell label="Total Months" sortKey="totalMonths" sort={sort} setSort={setSort} />
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Months Left</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Remaining Bill</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Note</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+                    <HeaderCell sortKey="bank" sort={sort} setSort={setSort}>Bank</HeaderCell>
+                    <HeaderCell sortKey="transaction" sort={sort} setSort={setSort}>Transaction</HeaderCell>
+                    <HeaderCell sortKey="monthlyPayment" sort={sort} setSort={setSort}>Monthly</HeaderCell>
+                    <HeaderCell sortKey="monthsPaid" sort={sort} setSort={setSort}>Paid</HeaderCell>
+                    <HeaderCell sortKey="totalMonths" sort={sort} setSort={setSort}>Total</HeaderCell>
+                    <HeaderCell sortKey="startDate" sort={sort} setSort={setSort}>Start Date</HeaderCell>
+                    <HeaderCell sortKey="firstPaymentDate" sort={sort} setSort={setSort}>First Payment</HeaderCell>
+                    <HeaderCell sortKey="finishETA" sort={sort} setSort={setSort}>Finish ETA</HeaderCell>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rest Bill</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {grouped.length === 0 && (<tr><td colSpan={9} className="p-6"><EmptyState /></td></tr>)}
-                  {grouped.map(([bank, items]) => (
-                    <React.Fragment key={bank}>
-                      <tr className="bg-gray-50 border-t"><td colSpan={9} className="px-3 py-2 text-xs uppercase tracking-wider text-gray-500">{bank}</td></tr>
-                      {items.map((r) => (
-                        <React.Fragment key={r.id}>
-                          <tr className="border-t hover:bg-gray-50/60">
-                            <td className="px-3 py-3 align-top">{r.bank}</td>
-                            <td className="px-3 py-3 align-top">
-                              <div className="font-medium text-gray-900">{r.transaction}</div>
-                              <div className="mt-1 flex items-center gap-2 text-xs text-gray-500"><Progress value={r.progress} /><span>{Math.round(r.progress)}%</span></div>
-                              <div className="mt-1 text-xs text-gray-600">
-                                {r.isCompleted ? (
-                                  <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-600 rounded-full" />Completed</span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 bg-gray-400 rounded-full" />Current month: <span className="font-medium tabular-nums">{r.currentInst}/{r.totalMonths}</span></span>
-                                )}
+                <tbody className="divide-y divide-gray-200">
+                  {sorted.length === 0 ? (
+                    <tr>
+                      <td colSpan="12" className="px-4 py-8 text-center">
+                        <EmptyState />
+                      </td>
+                    </tr>
+                  ) : (
+                    sorted.map((r) => {
+                      const isCompleted = r.monthsLeft === 0;
+                      const isNearCompletion = r.monthsLeft <= 2 && r.monthsLeft > 0;
+                      return (
+                        <tr key={r.id} className={`${isCompleted ? "opacity-60" : ""} hover:bg-gray-50`}>
+                          <td className="px-4 py-4 text-sm font-medium text-gray-900">{r.bank}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate" title={r.transaction}>{r.transaction}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{formatIDR(r.monthlyPayment)}</td>
+                          <td className="px-4 py-4 text-sm">
+                            <span className={isNearCompletion ? "text-amber-600 font-semibold" : "text-gray-900"}>{r.monthsPaid}</span>
+                            <span className="text-xs text-gray-500 ml-1">({r.currentInst})</span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{r.totalMonths}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{r.startDate || "-"}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{r.firstPaymentDate || "-"}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">{r.finishETA ? monthLabel(new Date(r.finishETA)) : "-"}</td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <Progress value={r.progress} />
+                              <span className="text-xs text-gray-600">{Math.round(r.progress)}%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm">
+                            <span className={isNearCompletion ? "text-amber-600 font-semibold" : "text-gray-900"}>{formatIDR(r.restBill)}</span>
+                            {r.monthsLeft > 0 && (
+                              <div className="text-xs text-gray-500">{r.monthsLeft} months left</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-sm max-w-xs">
+                            {noteEditId === r.id ? (
+                              <div className="space-y-2">
+                                <textarea rows={2} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} className="w-full border rounded px-2 py-1 text-xs" placeholder="Add notes..." />
+                                <div className="flex gap-1">
+                                  <button onClick={() => saveNote(r.id)} className="px-2 py-1 text-xs bg-black text-white rounded">Save</button>
+                                  <button onClick={() => { setNoteEditId(null); setNoteDraft(""); }} className="px-2 py-1 text-xs border rounded">Cancel</button>
+                                </div>
                               </div>
-                            </td>
-                            <td className="px-3 py-3 align-top">{formatIDR(r.monthlyPayment)}</td>
-                            <td className="px-3 py-3 align-top">{r.monthsPaid}</td>
-                            <td className="px-3 py-3 align-top">{r.totalMonths}</td>
-                            <td className={`px-3 py-3 align-top ${r.monthsLeft <= 2 ? "text-amber-600 font-semibold" : ""}`}>{r.monthsLeft}</td>
-                            <td className="px-3 py-3 align-top">{formatIDR(r.restBill)}</td>
-                            <td className="px-3 py-3 align-top">{r.note ? (<div className="text-gray-700"><span className="inline-block max-w-[18rem] truncate align-bottom">{r.note}</span></div>) : (<span className="text-gray-400">—</span>)}</td>
-                            <td className="px-3 py-3 align-top text-right"><RowActions disabled={r.monthsLeft === 0} onPay={() => handlePayOne(r.id)} onEdit={() => { setEditRow(r); setShowForm(true); }} onDelete={() => handleDelete(r.id)} onNote={() => openNote(r)} /></td>
-                          </tr>
-                          {noteEditId === r.id && (
-                            <tr className="bg-gray-50/60 border-t"><td colSpan={9} className="px-3 py-3"><div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3"><textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3} className="w-full md:flex-1 border rounded-xl px-3 py-2" placeholder="Add notes for this transaction (due dates, how to pay, reminders, etc.)" /><div className="flex gap-2 md:flex-col"><button onClick={() => saveNote(r.id)} className="px-3 py-2 rounded-xl border bg-black text-white">Save Note</button><button onClick={() => { setNoteEditId(null); setNoteDraft(""); }} className="px-3 py-2 rounded-xl border">Cancel</button></div></div></td></tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </React.Fragment>
-                  ))}
+                            ) : (
+                              <div className="truncate" title={r.note}>{r.note || "-"}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <RowActions onPay={() => handlePayOne(r.id)} onEdit={() => { setEditRow(r); setShowForm(true); }} onDelete={() => handleDelete(r.id)} onNote={() => openNote(r)} disabled={isCompleted} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
